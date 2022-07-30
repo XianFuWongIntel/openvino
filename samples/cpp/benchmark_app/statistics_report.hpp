@@ -139,7 +139,7 @@ public:
 
     virtual void dump();
 
-    virtual void dump_performance_counters(const std::vector<PerformanceCounters>& perfCounts);
+    virtual void dump_performance_counters(const std::vector<PerformanceCounters>& perfCounts, const std::string reqId);
 
 private:
     void dump_performance_counters_request(CsvDumper& dumper, const PerformanceCounters& perfCounts);
@@ -163,7 +163,7 @@ public:
     explicit StatisticsReportJSON(Config config) : StatisticsReport(std::move(config)) {}
 
     void dump() override;
-    void dump_performance_counters(const std::vector<PerformanceCounters>& perfCounts) override;
+    void dump_performance_counters(const std::vector<PerformanceCounters>& perfCounts, const std::string reqId) override;
 
 private:
     void dump_parameters(nlohmann::json& js, const StatisticsReport::Parameters& parameters);

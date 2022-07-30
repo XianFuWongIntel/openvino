@@ -42,6 +42,7 @@ public:
           outputClBuffer() {
         _request.set_callback([&](const std::exception_ptr& ptr) {
             _endTime = Time::now();
+            _perfCounts.push_back(_request.get_profiling_info());
             _callbackQueue(_id, _lat_group_id, get_execution_time_in_milliseconds(), ptr);
         });
     }
@@ -62,8 +63,15 @@ public:
         _callbackQueue(_id, _lat_group_id, get_execution_time_in_milliseconds(), nullptr);
     }
 
-    std::vector<ov::ProfilingInfo> get_performance_counts() {
-        return _request.get_profiling_info();
+    std::vector<std::vector<ov::ProfilingInfo>> get_performance_counts() {
+        return _perfCounts;
+    }
+
+    void reset_performance_counts() {
+        for (auto& perfCount : _perfCounts) {
+            perfCount.clear();
+        }
+        _perfCounts.clear();
     }
 
     void set_shape(const std::string& name, const ov::Shape& dims) {
@@ -103,6 +111,7 @@ private:
     size_t _lat_group_id;
     QueueCallbackFunction _callbackQueue;
     std::map<std::string, ::gpu::BufferType> outputClBuffer;
+    std::vector<std::vector<ov::ProfilingInfo>> _perfCounts;
 };
 
 class InferRequestsQueue final {
@@ -140,6 +149,12 @@ public:
         _latencies.clear();
         for (auto& group : _latency_groups) {
             group.clear();
+        }
+    }
+
+    void reset_all_perf_counts() {
+        for (auto& request : requests) {
+            request->reset_performance_counts();
         }
     }
 

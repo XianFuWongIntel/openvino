@@ -130,7 +130,7 @@ StatisticsReport::PerformanceCounters StatisticsReport::get_average_performance_
     return performanceCountersAvg;
 };
 
-void StatisticsReport::dump_performance_counters(const std::vector<PerformanceCounters>& perfCounts) {
+void StatisticsReport::dump_performance_counters(const std::vector<PerformanceCounters>& perfCounts, const std::string reqId) {
     if ((_config.report_type.empty()) || (_config.report_type == noCntReport)) {
         slog::info << "Statistics collecting for performance counters was not "
                       "requested. No reports are dumped."
@@ -141,7 +141,7 @@ void StatisticsReport::dump_performance_counters(const std::vector<PerformanceCo
         slog::info << "Performance counters are empty. No reports are dumped." << slog::endl;
         return;
     }
-    CsvDumper dumper(true, _config.report_folder + _separator + "benchmark_" + _config.report_type + "_report.csv");
+    CsvDumper dumper(true, _config.report_folder + _separator + "benchmark_ireq_" + reqId + "_" + _config.report_type + "_report.csv");
     if (_config.report_type == detailedCntReport) {
         for (auto& pc : perfCounts) {
             dump_performance_counters_request(dumper, pc);
@@ -151,7 +151,7 @@ void StatisticsReport::dump_performance_counters(const std::vector<PerformanceCo
     } else {
         throw std::logic_error("PM data can only be collected for average or detailed report types");
     }
-    slog::info << "Performance counters report is stored to " << dumper.getFilename() << slog::endl;
+    slog::info << "Performance counters report for " << reqId << "-th infer request is stored to " << dumper.getFilename() << slog::endl;
 }
 
 void StatisticsReportJSON::dump_parameters(nlohmann::json& js, const StatisticsReport::Parameters& parameters) {
@@ -182,7 +182,7 @@ void StatisticsReportJSON::dump() {
     slog::info << "Statistics report is stored to " << name << slog::endl;
 }
 
-void StatisticsReportJSON::dump_performance_counters(const std::vector<PerformanceCounters>& perfCounts) {
+void StatisticsReportJSON::dump_performance_counters(const std::vector<PerformanceCounters>& perfCounts, const std::string reqId) {
     if ((_config.report_type.empty()) || (_config.report_type == noCntReport)) {
         slog::info << "Statistics collecting for performance counters was not "
                       "requested. No reports are dumped."
@@ -195,7 +195,7 @@ void StatisticsReportJSON::dump_performance_counters(const std::vector<Performan
     }
 
     nlohmann::json js;
-    std::string name = _config.report_folder + _separator + "benchmark_" + _config.report_type + "_report.json";
+    std::string name = _config.report_folder + _separator + "benchmark_ireq_" + reqId + "_" + _config.report_type + "_report.json";
 
     if (_config.report_type == detailedCntReport) {
         js["report_type"] = "detailed";
@@ -212,7 +212,7 @@ void StatisticsReportJSON::dump_performance_counters(const std::vector<Performan
 
     std::ofstream out_stream(name);
     out_stream << std::setw(4) << js << std::endl;
-    slog::info << "Performance counters report is stored to " << name << slog::endl;
+    slog::info << "Performance counters report for " << reqId << "-th infer request is stored to " << name << slog::endl;
 }
 
 const nlohmann::json StatisticsReportJSON::perf_counters_to_json(

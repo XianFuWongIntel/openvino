@@ -960,6 +960,7 @@ int main(int argc, char* argv[]) {
                 {StatisticsVariant("first inference time (ms)", "first_inference_time", duration_ms)});
         }
         inferRequestsQueue.reset_times();
+        inferRequestsQueue.reset_all_perf_counts();
 
         size_t processedFramesN = 0;
         auto startTime = Time::now();
@@ -1120,17 +1121,22 @@ int main(int argc, char* argv[]) {
         }
 
         if (perf_counts) {
-            std::vector<std::vector<ov::ProfilingInfo>> perfCounts;
+            std::vector<std::vector<std::vector<ov::ProfilingInfo>>> fullPerfCounts;
             for (size_t ireq = 0; ireq < nireq; ireq++) {
                 auto reqPerfCounts = inferRequestsQueue.requests[ireq]->get_performance_counts();
                 if (FLAGS_pc) {
-                    slog::info << "Performance counts for " << ireq << "-th infer request:" << slog::endl;
-                    printPerformanceCounts(reqPerfCounts, std::cout, getFullDeviceName(core, FLAGS_d), false);
+                    for (size_t irun = 0; irun < reqPerfCounts.size(); irun++) {
+                        slog::info << "Performance counts for " << ireq << "-th infer request " << irun
+                                   << "-th run: " << slog::endl;
+                        printPerformanceCounts(reqPerfCounts[irun], std::cout, getFullDeviceName(core, FLAGS_d), false);
+                    }
                 }
-                perfCounts.push_back(reqPerfCounts);
+                fullPerfCounts.push_back(reqPerfCounts);
             }
             if (statistics) {
-                statistics->dump_performance_counters(perfCounts);
+                for (size_t ireq = 0; ireq < nireq; ireq++) {
+                    statistics->dump_performance_counters(fullPerfCounts[ireq], std::to_string(ireq));
+                }
             }
         }
 
