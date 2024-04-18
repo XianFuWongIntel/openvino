@@ -92,12 +92,20 @@ ZeroInferRequest::ZeroInferRequest(const std::shared_ptr<ZeroInitStructsHolder>&
     };
 
     for (const std::string& inputName : _metadata.inputNames) {
-        if (!executorInputDescriptors.count(inputName)) {
-            OPENVINO_THROW("Invalid graph input descriptor key: " + inputName);
+        const std::string& inputBufferName =
+            (executorInputDescriptors.find(std::string(BOOLEAN_TENSOR_PREFIX) + inputName) ==
+             executorInputDescriptors.end())
+                ? inputName
+                : std::string(BOOLEAN_TENSOR_PREFIX) + inputName;
+
+        if (!executorInputDescriptors.count(inputBufferName)) {
+            OPENVINO_THROW("Invalid graph input descriptor key: " + inputBufferName);
         }
 
         const IONodeDescriptor& parameterDescriptor = _metadata.parameters.at(inputName);
-        check_level_zero_attributes_match(parameterDescriptor, executorInputDescriptors.at(inputName), inputName);
+        check_level_zero_attributes_match(parameterDescriptor,
+                                          executorInputDescriptors.at(inputBufferName),
+                                          inputBufferName);
 
         ov::Allocator allocator;
         if (properties.flags & ZE_DEVICE_PROPERTY_FLAG_INTEGRATED) {
@@ -110,7 +118,7 @@ ZeroInferRequest::ZeroInferRequest(const std::shared_ptr<ZeroInitStructsHolder>&
         allocate_tensor(inputName, parameterDescriptor, TensorType::InputOrOutput, allocator);
 
         if (contains(_metadata.shapeNames, inputName)) {
-            const std::string shapeBufferName = SHAPE_TENSOR_PREFIX + inputName;
+            const std::string shapeBufferName = std::string(SHAPE_TENSOR_PREFIX) + inputName;
             const IONodeDescriptor& shapeDescriptor = _metadata.shapes.at(inputName);
 
             check_level_zero_attributes_match(shapeDescriptor,
@@ -123,19 +131,27 @@ ZeroInferRequest::ZeroInferRequest(const std::shared_ptr<ZeroInitStructsHolder>&
     }
 
     for (const std::string& outputName : _metadata.outputNames) {
-        if (!executorOutputDescriptors.count(outputName)) {
-            OPENVINO_THROW("Invalid graph output descriptor key: " + outputName);
+        const std::string& outputBufferName =
+            (executorOutputDescriptors.find(std::string(BOOLEAN_TENSOR_PREFIX) + outputName) ==
+             executorOutputDescriptors.end())
+                ? outputName
+                : std::string(BOOLEAN_TENSOR_PREFIX) + outputName;
+
+        if (!executorOutputDescriptors.count(outputBufferName)) {
+            OPENVINO_THROW("Invalid graph output descriptor key: " + outputBufferName);
         }
 
         const IONodeDescriptor& resultDescriptor = _metadata.results.at(outputName);
-        check_level_zero_attributes_match(resultDescriptor, executorOutputDescriptors.at(outputName), outputName);
+        check_level_zero_attributes_match(resultDescriptor,
+                                          executorOutputDescriptors.at(outputBufferName),
+                                          outputBufferName);
 
         auto allocator = zeroMemory::HostMemAllocator(backendPtr);
 
         allocate_tensor(outputName, resultDescriptor, TensorType::InputOrOutput, allocator);
 
         if (contains(_metadata.shapeNames, outputName)) {
-            const std::string shapeBufferName = SHAPE_TENSOR_PREFIX + outputName;
+            const std::string shapeBufferName = std::string(SHAPE_TENSOR_PREFIX) + outputName;
             const IONodeDescriptor& shapeDescriptor = _metadata.shapes.at(outputName);
 
             check_level_zero_attributes_match(shapeDescriptor,
@@ -148,8 +164,8 @@ ZeroInferRequest::ZeroInferRequest(const std::shared_ptr<ZeroInitStructsHolder>&
     }
 
     for (const std::string& stateName : _metadata.stateNames) {
-        const std::string& stateInputBufferName = READVALUE_PREFIX + stateName;
-        const std::string& stateOutputBufferName = ASSIGN_PREFIX + stateName;
+        const std::string& stateInputBufferName = std::string(READVALUE_PREFIX) + stateName;
+        const std::string& stateOutputBufferName = std::string(ASSIGN_PREFIX) + stateName;
 
         if (!executorInputDescriptors.count(stateInputBufferName)) {
             OPENVINO_THROW("Invalid graph input descriptor key: " + stateInputBufferName);
@@ -275,9 +291,11 @@ void ZeroInferRequest::check_network_precision(const ov::element::Type_t precisi
         break;
     case ov::element::Type_t::i64:
         break;
+    case ov::element::Type_t::boolean:
+        break;
     default:
         OPENVINO_THROW("Unsupported tensor precision: " + ov::element::Type(precision).get_type_name() +
-                       "! Supported precisions: FP32, FP16, U8, I8, U16, I16, U32, I32, U64, I64");
+                       "! Supported precisions: FP32, FP16, U8, I8, U16, I16, U32, I32, U64, I64, BOOLEAN");
     }
 }
 

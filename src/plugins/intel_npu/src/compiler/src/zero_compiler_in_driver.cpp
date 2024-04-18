@@ -884,6 +884,9 @@ void LevelZeroCompilerInDriver<TableExtension>::getLayoutOrStateDescriptor(IONod
     const ov::Shape shape = ov::Shape(reshapedDimensions);
 
     if (!isStateInputName(legacyName) && !isStateOutputName(legacyName)) {
+        if (isBooleanTensorName(legacyName)) {
+            legacyName = legacyName.substr(BOOLEAN_TENSOR_PREFIX.length());
+        }
         if (arg.type == ZE_GRAPH_ARGUMENT_TYPE_INPUT) {
             _logger.info("getLayoutOrStateDescriptor Found input \"%s\"", legacyName.c_str());
 
@@ -918,8 +921,8 @@ void LevelZeroCompilerInDriver<TableExtension>::getNodeOrStateDescriptorLegacy(
     std::vector<std::string>& stateNames,
     const ze_graph_argument_properties_t& arg) const {
     std::string legacyName = arg.name;
-    const ov::element::Type_t precision = toOVElementType(arg.devicePrecision);
-
+    const ov::element::Type_t precision =
+        (isBooleanTensorName(legacyName)) ? ov::element::Type_t::boolean : toOVElementType(arg.devicePrecision);
     // The layout shall differ from the default one only when using significantly older drivers. In order to accommodate
     // this case, an extra attribute needs to be stored which holds the transposed shape.
     const std::vector<size_t> originalDimensions(arg.dims, arg.dims + zeLayoutToRank(arg.deviceLayout));
@@ -928,6 +931,9 @@ void LevelZeroCompilerInDriver<TableExtension>::getNodeOrStateDescriptorLegacy(
     const ov::Shape transposedShape = ov::Shape(reshapedDimensions);
 
     if (!isStateInputName(legacyName) && !isStateOutputName(legacyName)) {
+        if (isBooleanTensorName(legacyName)) {
+            legacyName = legacyName.substr(BOOLEAN_TENSOR_PREFIX.length());
+        }
         if (arg.type == ZE_GRAPH_ARGUMENT_TYPE_INPUT) {
             _logger.info("getNodeOrStateDescriptorLegacy Found input \"%s\"", legacyName.c_str());
 
@@ -991,7 +997,13 @@ static void getNodeDescriptor(IONodeDescriptorMap& nodeDescriptors,
     for (uint32_t id = 0; id < arg.dims_count; id++) {
         shape.push_back(arg.dims[id]);
     }
-    const std::string& legacyName = arg.name;
+
+    std::string legacyName = arg.name;
+
+    if (isBooleanTensorName(legacyName)) {
+        precision = ov::element::Type_t::boolean;
+        legacyName = legacyName.substr(BOOLEAN_TENSOR_PREFIX.length());
+    }
 
     names.push_back(legacyName);
     nodeDescriptors[legacyName] =

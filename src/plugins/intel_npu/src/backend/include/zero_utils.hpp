@@ -105,6 +105,7 @@ static inline ze_graph_argument_precision_t getZePrecision(const ov::element::Ty
     case ov::element::Type_t::i8:
         return ZE_GRAPH_ARGUMENT_PRECISION_INT8;
     case ov::element::Type_t::u8:
+    case ov::element::Type_t::boolean:
         return ZE_GRAPH_ARGUMENT_PRECISION_UINT8;
     case ov::element::Type_t::i16:
         return ZE_GRAPH_ARGUMENT_PRECISION_INT16;

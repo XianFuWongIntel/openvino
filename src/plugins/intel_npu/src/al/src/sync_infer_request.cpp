@@ -29,19 +29,24 @@ SyncInferRequest::SyncInferRequest(const std::shared_ptr<const ICompiledModel>& 
     // Map the node names to the legacy ones used by the I/O tensors in order to allow an easier access to the tensors'
     // contents
     for (const auto& [legacyName, parameterDescriptor] : _metadata.parameters) {
-        _nodeNameToLegacyName[parameterDescriptor.currentNodeName] = legacyName;
+        const auto inputName = (parameterDescriptor.precision == ov::element::Type_t::boolean)
+                                   ? std::string(BOOLEAN_TENSOR_PREFIX) + legacyName
+                                   : legacyName;
+        _nodeNameToLegacyName[parameterDescriptor.currentNodeName] = inputName;
+        _inputAndStateInputNames.push_back(inputName);
     }
     for (const auto& [legacyName, resultDescriptor] : _metadata.results) {
-        _nodeNameToLegacyName[resultDescriptor.currentNodeName] = legacyName;
+        const auto outputName = (resultDescriptor.precision == ov::element::Type_t::boolean)
+                                    ? std::string(BOOLEAN_TENSOR_PREFIX) + legacyName
+                                    : legacyName;
+        _nodeNameToLegacyName[resultDescriptor.currentNodeName] = outputName;
+        _outputAndStateOutputNames.push_back(outputName);
     }
-
-    _inputAndStateInputNames = _metadata.inputNames;
-    _outputAndStateOutputNames = _metadata.outputNames;
 
     for (const std::string& stateName : _metadata.stateNames) {
         // State variables shall be identified by specific prefixes in order to avoid a potential tensor name collision
-        _inputAndStateInputNames.push_back(READVALUE_PREFIX + stateName);
-        _outputAndStateOutputNames.push_back(ASSIGN_PREFIX + stateName);
+        _inputAndStateInputNames.push_back(std::string(READVALUE_PREFIX) + stateName);
+        _outputAndStateOutputNames.push_back(std::string(ASSIGN_PREFIX) + stateName);
     }
 
     const auto contains = [](const auto& container, const auto& value) {
@@ -50,10 +55,10 @@ SyncInferRequest::SyncInferRequest(const std::shared_ptr<const ICompiledModel>& 
 
     for (const auto& shapeName : _metadata.shapeNames) {
         if (contains(_inputAndStateInputNames, shapeName)) {
-            _inputAndStateInputNames.push_back(SHAPE_TENSOR_PREFIX + shapeName);
+            _inputAndStateInputNames.push_back(std::string(SHAPE_TENSOR_PREFIX) + shapeName);
         }
         if (contains(_outputAndStateOutputNames, shapeName)) {
-            _outputAndStateOutputNames.push_back(SHAPE_TENSOR_PREFIX + shapeName);
+            _outputAndStateOutputNames.push_back(std::string(SHAPE_TENSOR_PREFIX) + shapeName);
         }
     }
 }
@@ -182,8 +187,11 @@ void SyncInferRequest::allocate_tensor(std::string tensorName,
 
     if (tensorType == TensorType::Shape) {
         _shapesTensors[tensorName] = tensor;
-        tensorName = SHAPE_TENSOR_PREFIX + tensorName;
+        tensorName = std::string(SHAPE_TENSOR_PREFIX) + tensorName;
+    } else if (tensorType == TensorType::InputOrOutput && descriptor.precision == ov::element::Type_t::boolean) {
+        tensorName = std::string(BOOLEAN_TENSOR_PREFIX) + tensorName;
     }
+
     if (tensorType == TensorType::State) {
         _variableStates[tensorName] = std::make_shared<VariableState>(tensorName, tensor);
 
@@ -191,10 +199,13 @@ void SyncInferRequest::allocate_tensor(std::string tensorName,
         // Additionally, only one buffer is required in the whole flow, acting as an input before running the inference
         // and as an output after performing it. Thus both the "state input" and "state output" entries shall point to
         // the same buffer.
-        _copyAllTensors[READVALUE_PREFIX + tensorName] = std::move(tensor);
-        _copyAllTensors[ASSIGN_PREFIX + tensorName] = _copyAllTensors[READVALUE_PREFIX + tensorName];
-        _allTensors[READVALUE_PREFIX + tensorName] = _copyAllTensors[READVALUE_PREFIX + tensorName];
-        _allTensors[ASSIGN_PREFIX + tensorName] = _copyAllTensors[READVALUE_PREFIX + tensorName];
+        _copyAllTensors[std::string(READVALUE_PREFIX) + tensorName] = std::move(tensor);
+        _copyAllTensors[std::string(ASSIGN_PREFIX) + tensorName] =
+            _copyAllTensors[std::string(READVALUE_PREFIX) + tensorName];
+        _allTensors[std::string(READVALUE_PREFIX) + tensorName] =
+            _copyAllTensors[std::string(READVALUE_PREFIX) + tensorName];
+        _allTensors[std::string(ASSIGN_PREFIX) + tensorName] =
+            _copyAllTensors[std::string(READVALUE_PREFIX) + tensorName];
     } else {
         _copyAllTensors[tensorName] = std::move(tensor);
         _allTensors[tensorName] = _copyAllTensors[tensorName];
